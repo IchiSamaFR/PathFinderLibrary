@@ -41,8 +41,8 @@ namespace AstarLibrary
         }
 
         public Node Previous;
-        public Position Pos;
-        public Position EndNodePos;
+        public (int x, int y) Pos;
+        public (int x, int y) EndNodePos;
 
         public float Multiplier
         {
@@ -60,7 +60,7 @@ namespace AstarLibrary
         public float Hcost = 0; //Distance from ending node
         public float Fcost { get => Gcost + Hcost; }
 
-        public Node(Position pos)
+        public Node((int x, int y) pos)
         {
             Pos = pos;
         }
@@ -100,9 +100,10 @@ namespace AstarLibrary
         {
             Multiplier = multiplier;
         }
-        public bool SetCost(float gcost, Position end)
+        public bool SetCost(float gcost, (int x, int y) end)
         {
-            if (IsWall) return false;
+            if (IsWall)
+                return false;
 
             Gcost = gcost;
             EndNodePos = end;
@@ -116,10 +117,10 @@ namespace AstarLibrary
             Hcost = SumHcost(end);
             return false;
         }
-        private float SumHcost(Position end)
+        private float SumHcost((int x, int y) end)
         {
-            int x = end.X - Pos.X >= 0 ? end.X - Pos.X : Pos.X - end.X;
-            int y = end.Y - Pos.Y >= 0 ? end.Y - Pos.Y : Pos.Y - end.Y;
+            int x = end.x - Pos.x >= 0 ? end.x - Pos.x : Pos.x - end.x;
+            int y = end.y - Pos.y >= 0 ? end.y - Pos.y : Pos.y - end.y;
 
             int val = 0;
             if (x - y >= 0)
@@ -139,9 +140,9 @@ namespace AstarLibrary
         {
             for (int i = 0; i < NodesAround.Count; i++)
             {
-                float newGCost = 0;
+                float newGCost;
                 Node node = NodesAround[i];
-                if (node.Pos.X != Pos.X && node.Pos.Y != Pos.Y)
+                if (node.Pos.x != Pos.x && node.Pos.y != Pos.y)
                 {
                     newGCost = Gcost + 14 * node.Multiplier;
                 }
@@ -150,7 +151,7 @@ namespace AstarLibrary
                     newGCost = Gcost + 10 * node.Multiplier;
                 }
 
-                if (!node.IsStartNode && (node.Gcost <= 0 || node?.Gcost > newGCost))
+                if (!node.IsStartNode && (node.Gcost <= 0 || node.Gcost > newGCost))
                 {
                     node.Previous = this;
                     if (node.SetCost(newGCost, EndNodePos))

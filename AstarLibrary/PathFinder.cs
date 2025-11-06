@@ -3,117 +3,96 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace AstarLibrary
 {
     public class PathFinder
     {
+        private const int DefaultWidth = 10;
+        private const int DefaultHeight = 10;
+
         private bool _isDiagonal;
         private bool _isFinished;
-        private Node[,] _nodes;
+        private Dictionary<(int x, int y), Node> _nodes;
+        private List<Node> _nodesListCache;
+        private Node _startingNode;
+        private Node _endingNode;
+        private (int x, int y) _startingPos;
+        private (int x, int y) _endingPos;
 
-        public bool PathFind
-        {
-            get
-            {
-                return EndingNode.PathFound;
-            }
-        }
+        public bool PathFound => _endingNode?.PathFound ?? false;
+
         public bool PathFinished
         {
-            get
-            {
-                return _isFinished || PathFind;
-            }
-            set
-            {
-                _isFinished = value;
-            }
+            get => _isFinished || PathFound;
+            set => _isFinished = value;
         }
+
         public bool IsDiagonal
         {
-            get
-            {
-                return _isDiagonal;
-            }
+            get => _isDiagonal;
             set
             {
                 if (_isDiagonal != value)
                 {
                     _isDiagonal = value;
-                    SetNodesAround();
+                    UpdateNodesAround();
                 }
             }
         }
 
-        public int Width;
-        public int Height;
+        public int Width { get; private set; }
 
-        public Node[,] Nodes
+        public int Height { get; private set; }
+
+        public List<Node> NodesList
         {
             get
             {
-                return _nodes;
-            }
-            private set
-            {
-                _nodes = value;
+                if (_nodesListCache == null)
+                {
+                    _nodesListCache = _nodes.Values.ToList();
+                }
+                return _nodesListCache;
             }
         }
-        private Node StartingNode;
-        private Node EndingNode;
 
-        private Position StartingPos;
-        private Position EndingPos;
+        public PathFinder(int width = DefaultWidth, int height = DefaultHeight, (int x, int y)? start = null, (int x, int y)? end = null)
+        {
+            Width = width;
+            Height = height;
+            _nodes = new Dictionary<(int x, int y), Node>();
 
-        public PathFinder(int width, int height)
-        {
-            GenNodes(width, height);
-            SetStartPos(new Position(0, 0));
-            SetEndPos(new Position(width - 1, height - 1));
-        }
-        public PathFinder(int width, int height, Position start, Position end)
-        {
-            GenNodes(width, height);
-            SetStartPos(start);
-            SetEndPos(end);
+            SetStartPos(start ?? (0, 0));
+            SetEndPos(end ?? (width - 1, height - 1));
         }
 
         public Node SelectNextNode()
         {
-            if (PathFinished) return null;
-
-            Node nodeToSelect = null;
-            foreach (var node in Nodes)
+            if (PathFinished)
             {
-                if (!node.IsWall && !node.IsChecked && (nodeToSelect == null || node.Fcost < nodeToSelect.Fcost) && node.Fcost > 0)
-                {
-                    nodeToSelect = node;
-                }
+                return null;
             }
+
+            Node nodeToSelect = FindLowestCostNode();
+
             if (nodeToSelect != null)
             {
                 nodeToSelect.Select();
                 return nodeToSelect;
             }
-            else
-            {
-                PathFinished = true;
-                return null;
-            }
+
+            PathFinished = true;
+            return null;
         }
+
         public List<Node> SelectPath()
         {
-            while(!PathFinished)
+            while (!PathFinished)
             {
-                Node nodeToSelect = null;
-                foreach (var node in Nodes)
-                {
-                    if (!node.IsWall && !node.IsChecked && (nodeToSelect == null || node.Fcost < nodeToSelect.Fcost) && node.Fcost > 0)
-                    {
-                        nodeToSelect = node;
-                    }
-                }
+                Node nodeToSelect = FindLowestCostNode();
+
                 if (nodeToSelect != null)
                 {
                     nodeToSelect.Select();
@@ -123,126 +102,208 @@ namespace AstarLibrary
                     PathFinished = true;
                 }
             }
-            return EndingNode.GetEndPath();
+
+            return _endingNode?.GetEndPath() ?? new List<Node>();
         }
 
+        public void ToggleWall(int x, int y)
+        {
+            var node = GetNode(x, y);
+            if (node != null && !node.IsStartNode && !node.IsEndNode)
+            {
+                node.IsWall = !node.IsWall;
+            }
+        }
+
+        public void Clear()
+        {
+            PathFinished = false;
+
+            _nodes.Clear();
+            _nodesListCache = null;
+
+            SetStartPos(_startingPos);
+            SetEndPos(_endingPos);
+        }
         public void Reset()
         {
             PathFinished = false;
-            foreach (var item in Nodes)
+
+            // Remove all nodes that are not walls
+            var wallNodes = _nodes.Where(kvp => !kvp.Value.IsWall).ToList();
+            foreach (var kvp in wallNodes)
             {
-                item.ResetValues();
+                _nodes.Remove(kvp.Key);
             }
-            SetStartPos(StartingPos);
-            SetEndPos(EndingPos);
+
+            SetStartPos(_startingPos);
+            SetEndPos(_endingPos);
+            _nodesListCache = null;
         }
-        private void GenNodes(int width, int height)
+
+        private Node FindLowestCostNode()
         {
-            Width = width;
-            Height = height;
-            Nodes = new Node[Width, Height];
-            for (int x = 0; x < Width; x++)
+            Node nodeToSelect = null;
+
+            foreach (var node in _nodes.Values)
             {
-                for (int y = 0; y < Height; y++)
+                if (!node.IsWall && !node.IsChecked && node.Fcost > 0)
                 {
-                    Nodes[x, y] = new Node(new Position(x, y));
-                    Nodes[x, y].EndNodePos = EndingPos;
-                }
-            }
-            SetNodesAround();
-        }
-        private void SetNodesAround()
-        {
-            foreach (var node in Nodes)
-            {
-                node.NodesAround = GetNodesAround(node.Pos);
-            }
-        }
-        private void GenCosts(float[,] costs)
-        {
-            for (int x = 0; x < costs.GetLength(0); x++)
-            {
-                for (int y = 0; y < costs.GetLength(1); y++)
-                {
-                    var tmp = GetNode(x, y);
-                    if (tmp != null)
+                    if (nodeToSelect == null || node.Fcost < nodeToSelect.Fcost)
                     {
-                        tmp.SetCostMultiplier(costs[x, y]);
+                        nodeToSelect = node;
                     }
                 }
             }
-        }
-        private void SetStartPos(Position startPos)
-        {
-            var node = GetNode(startPos.X, startPos.Y);
-            if(node == null)
-            {
-                return;
-            }
-            StartingPos = startPos;
-            StartingNode = node;
-            if (EndingPos != null)
-            {
-                node.SetCost(0, EndingPos);
-            }
-            node.IsStartNode = true;
-        }
-        private void SetEndPos(Position endPos)
-        {
-            var node = GetNode(endPos.X, endPos.Y);
-            if (node == null)
-            {
-                return;
-            }
-            EndingPos = endPos;
-            EndingNode = node;
-            if (StartingNode != null)
-            {
-                StartingNode.SetCost(0, EndingPos);
-            }
-            node.IsEndNode = true;
+
+            return nodeToSelect;
         }
 
-        private List<Node> GetNodesAround(Position pos)
+        private void UpdateNodesAround()
         {
-            List<Node> nodes = new List<Node>();
+            foreach (var node in _nodes.Values)
+            {
+                node.NodesAround = GetNodesAround(node.Pos);
+            }
+            _nodesListCache = null;
+        }
+
+        public void SetGridSize(int width, int height)
+        {
+            Width = width;
+            Height = height;
+
+            var outOfBoundsNodes = _nodes.Where(kvp => !IsValidPosition(kvp.Key.x, kvp.Key.y) || !kvp.Value.IsWall).ToList();
+            foreach (var kvp in outOfBoundsNodes)
+            {
+                _nodes.Remove(kvp.Key);
+            }
+            SetStartPos(_startingPos);
+            SetEndPos(_endingPos);
+            _nodesListCache = null;
+        }
+
+        public void SetStartPos((int x, int y) startPos)
+        {
+            if (!IsValidPosition(startPos.x, startPos.y))
+            {
+                return;
+            }
+
+            if (_startingNode != null)
+            {
+                _startingNode.IsStartNode = false;
+            }
+
+            _startingPos = startPos;
+            _startingNode = GetOrCreateNode(startPos.x, startPos.y);
+
+            if (_endingPos != default)
+            {
+                _startingNode.SetCost(0, _endingPos);
+            }
+
+            _startingNode.IsStartNode = true;
+            _nodesListCache = null;
+        }
+
+        public void SetEndPos((int x, int y) endPos)
+        {
+            if (!IsValidPosition(endPos.x, endPos.y))
+            {
+                return;
+            }
+
+            if(_endingNode != null)
+            {
+                _endingNode.IsEndNode = false;
+            }
+
+            _endingPos = endPos;
+            _endingNode = GetOrCreateNode(endPos.x, endPos.y);
+
+            if (_startingNode != null)
+            {
+                _startingNode.SetCost(0, _endingPos);
+            }
+
+            _endingNode.IsEndNode = true;
+            _nodesListCache = null;
+        }
+
+        private List<Node> GetNodesAround((int x, int y) pos)
+        {
+            List<Node> nodes = new List<Node>(IsDiagonal ? 8 : 4);
 
             if (IsDiagonal)
             {
-                for (int x = pos.X - 1; x <= pos.X + 1; x++)
+                for (int x = pos.x - 1; x <= pos.x + 1; x++)
                 {
-                    for (int y = pos.Y - 1; y <= pos.Y + 1; y++)
+                    for (int y = pos.y - 1; y <= pos.y + 1; y++)
                     {
-                        if (x != pos.X || y != pos.Y)
+                        if (x == pos.x && y == pos.y)
                         {
-                            Node node = GetNode(x, y);
-                            if (node != null)
-                                nodes.Add(node);
+                            continue;
                         }
+
+                        AddNodeIfExists(nodes, x, y);
                     }
                 }
             }
             else
             {
-                if (GetNode(pos.X + 1, pos.Y) != null)
-                    nodes.Add(GetNode(pos.X + 1, pos.Y));
-                if (GetNode(pos.X - 1, pos.Y) != null)
-                    nodes.Add(GetNode(pos.X - 1, pos.Y));
-
-                if (GetNode(pos.X, pos.Y + 1) != null)
-                    nodes.Add(GetNode(pos.X, pos.Y + 1));
-                if (GetNode(pos.X, pos.Y - 1) != null)
-                    nodes.Add(GetNode(pos.X, pos.Y - 1));
+                AddNodeIfExists(nodes, pos.x + 1, pos.y);
+                AddNodeIfExists(nodes, pos.x - 1, pos.y);
+                AddNodeIfExists(nodes, pos.x, pos.y + 1);
+                AddNodeIfExists(nodes, pos.x, pos.y - 1);
             }
-
 
             return nodes;
         }
+
+        private void AddNodeIfExists(List<Node> nodes, int x, int y)
+        {
+            if (IsValidPosition(x, y))
+            {
+                nodes.Add(GetOrCreateNode(x, y));
+            }
+        }
+
         private Node GetNode(int x, int y)
         {
-            if (x < 0 || x >= Width || y < 0 || y >= Height) return null;
+            if (!IsValidPosition(x, y))
+            {
+                return null;
+            }
 
-            return Nodes[x, y];
+            _nodes.TryGetValue((x, y), out var node);
+            return node;
+        }
+
+        private Node GetOrCreateNode(int x, int y)
+        {
+            if (!IsValidPosition(x, y))
+            {
+                return null;
+            }
+
+            if (!_nodes.TryGetValue((x, y), out var node))
+            {
+                node = new Node((x, y))
+                {
+                    EndNodePos = _endingPos
+                };
+                _nodes[(x, y)] = node;
+                node.NodesAround = GetNodesAround((x, y));
+                _nodesListCache = null;
+            }
+
+            return node;
+        }
+
+        private bool IsValidPosition(int x, int y)
+        {
+            return x >= 0 && x < Width && y >= 0 && y < Height;
         }
     }
 }
