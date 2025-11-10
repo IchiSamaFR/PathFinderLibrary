@@ -1,23 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+﻿using AstarLibrary.Interfaces;
+using AstarLibrary.Models;
 
-namespace AstarLibrary
+namespace AstarLibrary.Modules
 {
-    public class PathFinder
+    public class AstarFinder : IFinder
     {
         private const int DefaultWidth = 10;
         private const int DefaultHeight = 10;
 
-        private bool _isDiagonal;
         private bool _isFinished;
-        private Dictionary<(int x, int y), Node> _nodes;
-        private List<Node> _nodesListCache;
-        private Node _startingNode;
-        private Node _endingNode;
+        private Dictionary<(int x, int y), AstarNode> _nodes;
+        private List<INode> _nodesListCache;
+        private AstarNode _startingNode;
+        private AstarNode _endingNode;
         private (int x, int y) _startingPos;
         private (int x, int y) _endingPos;
 
@@ -29,53 +24,51 @@ namespace AstarLibrary
             set => _isFinished = value;
         }
 
-        public bool IsDiagonal
+        public INode Starting
         {
-            get => _isDiagonal;
-            set
-            {
-                if (_isDiagonal != value)
-                {
-                    _isDiagonal = value;
-                    UpdateNodesAround();
-                }
-            }
+            get => _startingNode;
         }
+        public INode Ending
+        {
+            get => _endingNode;
+        }
+
+        public bool IsDiagonal { get; set; }
 
         public int Width { get; private set; }
 
         public int Height { get; private set; }
 
-        public List<Node> NodesList
+        public List<INode> NodesList
         {
             get
             {
                 if (_nodesListCache == null)
                 {
-                    _nodesListCache = _nodes.Values.ToList();
+                    _nodesListCache = _nodes.Values.Cast<INode>().ToList();
                 }
                 return _nodesListCache;
             }
         }
 
-        public PathFinder(int width = DefaultWidth, int height = DefaultHeight, (int x, int y)? start = null, (int x, int y)? end = null)
+        public AstarFinder(int width = DefaultWidth, int height = DefaultHeight, (int x, int y)? start = null, (int x, int y)? end = null)
         {
             Width = width;
             Height = height;
-            _nodes = new Dictionary<(int x, int y), Node>();
+            _nodes = new Dictionary<(int x, int y), AstarNode>();
 
             SetStartPos(start ?? (0, 0));
             SetEndPos(end ?? (width - 1, height - 1));
         }
 
-        public Node SelectNextNode()
+        public AstarNode SelectNextNode()
         {
             if (PathFinished)
             {
                 return null;
             }
 
-            Node nodeToSelect = FindLowestCostNode();
+            AstarNode nodeToSelect = FindLowestCostNode();
 
             if (nodeToSelect != null)
             {
@@ -87,11 +80,11 @@ namespace AstarLibrary
             return null;
         }
 
-        public List<Node> SelectPath()
+        public List<AstarNode> SelectPath()
         {
             while (!PathFinished)
             {
-                Node nodeToSelect = FindLowestCostNode();
+                AstarNode nodeToSelect = FindLowestCostNode();
 
                 if (nodeToSelect != null)
                 {
@@ -103,7 +96,7 @@ namespace AstarLibrary
                 }
             }
 
-            return _endingNode?.GetEndPath() ?? new List<Node>();
+            return _endingNode?.GetEndPath() ?? new List<AstarNode>();
         }
 
         public void ToggleWall(int x, int y)
@@ -129,11 +122,15 @@ namespace AstarLibrary
         {
             PathFinished = false;
 
-            // Remove all nodes that are not walls
-            var wallNodes = _nodes.Where(kvp => !kvp.Value.IsWall).ToList();
-            foreach (var kvp in wallNodes)
+            // Remove all nodes out of bounds
+            var outOfBoundsNodes = _nodes.Where(kvp => !IsValidPosition(kvp.Key.x, kvp.Key.y)).ToList();
+            foreach (var kvp in outOfBoundsNodes)
             {
                 _nodes.Remove(kvp.Key);
+            }
+            foreach (var node in _nodes.Values)
+            {
+                node.Reset();
             }
 
             SetStartPos(_startingPos);
@@ -141,9 +138,9 @@ namespace AstarLibrary
             _nodesListCache = null;
         }
 
-        private Node FindLowestCostNode()
+        private AstarNode FindLowestCostNode()
         {
-            Node nodeToSelect = null;
+            AstarNode nodeToSelect = null;
 
             foreach (var node in _nodes.Values)
             {
@@ -157,15 +154,6 @@ namespace AstarLibrary
             }
 
             return nodeToSelect;
-        }
-
-        private void UpdateNodesAround()
-        {
-            foreach (var node in _nodes.Values)
-            {
-                node.NodesAround = GetNodesAround(node.Pos);
-            }
-            _nodesListCache = null;
         }
 
         public void SetGridSize(int width, int height)
@@ -231,9 +219,9 @@ namespace AstarLibrary
             _nodesListCache = null;
         }
 
-        private List<Node> GetNodesAround((int x, int y) pos)
+        private List<AstarNode> GetNodesAround((int x, int y) pos)
         {
-            List<Node> nodes = new List<Node>(IsDiagonal ? 8 : 4);
+            List<AstarNode> nodes = new List<AstarNode>(IsDiagonal ? 8 : 4);
 
             if (IsDiagonal)
             {
@@ -261,7 +249,7 @@ namespace AstarLibrary
             return nodes;
         }
 
-        private void AddNodeIfExists(List<Node> nodes, int x, int y)
+        private void AddNodeIfExists(List<AstarNode> nodes, int x, int y)
         {
             if (IsValidPosition(x, y))
             {
@@ -269,7 +257,7 @@ namespace AstarLibrary
             }
         }
 
-        private Node GetNode(int x, int y)
+        public AstarNode GetNode(int x, int y)
         {
             if (!IsValidPosition(x, y))
             {
@@ -280,7 +268,7 @@ namespace AstarLibrary
             return node;
         }
 
-        private Node GetOrCreateNode(int x, int y)
+        public AstarNode GetOrCreateNode(int x, int y)
         {
             if (!IsValidPosition(x, y))
             {
@@ -289,7 +277,7 @@ namespace AstarLibrary
 
             if (!_nodes.TryGetValue((x, y), out var node))
             {
-                node = new Node((x, y))
+                node = new AstarNode((x, y))
                 {
                     EndNodePos = _endingPos
                 };

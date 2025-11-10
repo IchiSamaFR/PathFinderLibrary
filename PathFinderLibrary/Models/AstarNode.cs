@@ -1,21 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using AstarLibrary.Interfaces;
 
-namespace AstarLibrary
+namespace AstarLibrary.Models
 {
-    public class Node
+    public class AstarNode : INode
     {
-        private bool _isChecked = false;
         private float _multiplier = 1;
 
-        public List<Node> NodesAround;
+        public List<AstarNode> NodesAround;
 
-        public bool IsEndNode; //Is the ending node
-        public bool IsStartNode; //Is the start node
-        public bool PathFound;
+        public bool IsEndNode { get; set; } //Is the ending node
+        public bool IsStartNode { get; set; } //Is the start node
+        public bool PathFound { get; set; }
 
         public bool IsWall
         {
@@ -28,21 +23,11 @@ namespace AstarLibrary
                 _multiplier = value ? 0 : 1;
             }
         }
-        public bool IsChecked
-        {
-            get
-            {
-                return _isChecked;
-            }
-            set
-            {
-                _isChecked = value;
-            }
-        }
+        public bool IsChecked { get; set; }
 
-        public Node Previous;
-        public (int x, int y) Pos;
-        public (int x, int y) EndNodePos;
+        public AstarNode Previous;
+        public (int x, int y) Pos { get; private set; }
+        public (int x, int y) EndNodePos { get; set; }
 
         public float Multiplier
         {
@@ -60,7 +45,7 @@ namespace AstarLibrary
         public float Hcost = 0; //Distance from ending node
         public float Fcost { get => Gcost + Hcost; }
 
-        public Node((int x, int y) pos)
+        public AstarNode((int x, int y) pos)
         {
             Pos = pos;
         }
@@ -70,7 +55,7 @@ namespace AstarLibrary
             IsChecked = true;
             CheckAround();
         }
-        public void ResetValues()
+        public void Reset()
         {
             Gcost = 0;
             Hcost = 0;
@@ -78,18 +63,18 @@ namespace AstarLibrary
             PathFound = false;
         }
 
-        public List<Node> SetEndPath()
+        public List<AstarNode> SetEndPath()
         {
-            var lst = new List<Node>();
+            var lst = new List<AstarNode>();
             PathFound = true;
 
             if (Previous != null)
                 lst.AddRange(Previous.SetEndPath());
             return lst;
         }
-        public List<Node> GetEndPath()
+        public List<AstarNode> GetEndPath()
         {
-            var lst = new List<Node>();
+            var lst = new List<AstarNode>();
 
             if (Previous != null)
                 lst.AddRange(Previous.SetEndPath());
@@ -141,7 +126,7 @@ namespace AstarLibrary
             for (int i = 0; i < NodesAround.Count; i++)
             {
                 float newGCost;
-                Node node = NodesAround[i];
+                AstarNode node = NodesAround[i];
                 if (node.Pos.x != Pos.x && node.Pos.y != Pos.y)
                 {
                     newGCost = Gcost + 14 * node.Multiplier;

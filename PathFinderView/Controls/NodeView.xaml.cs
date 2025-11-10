@@ -21,7 +21,8 @@ namespace AstarView.Controls
     /// </summary>
     public partial class NodeView : UserControl
     {
-        public Position Pos;
+        public int PosX { get; set; }
+        public int PosY { get; set; }
 
         public NodeView()
         {
@@ -30,7 +31,7 @@ namespace AstarView.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow.instance.AddMultiplier(Pos);
+            MainWindow.instance.AddMultiplier(PosX, PosY);
         }
     }
 }

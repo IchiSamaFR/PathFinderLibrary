@@ -2,13 +2,13 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework> 
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AstarLibrary\AstarLibrary.csproj" />
+    <ProjectReference Include="..\PathFinderLibrary\PathFinderLibrary.csproj" />
   </ItemGroup>
 
 </Project>

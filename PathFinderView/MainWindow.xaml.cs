@@ -1,6 +1,8 @@
-﻿using AstarLibrary;
+﻿using AstarLibrary.Models;
+using AstarLibrary.Modules;
 using AstarView.Controls;
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -15,7 +17,7 @@ namespace AstarView
         public static MainWindow instance;
 
         public NodeView[,] Nodes = new NodeView[10, 10];
-        public PathFinder pathFinder = new PathFinder(10, 10);
+        public AstarFinder pathFinder = new AstarFinder(10, 10);
         private DispatcherTimer timer = new DispatcherTimer();
 
         public bool ShowValues { get => showValues.IsChecked ?? false; }
@@ -65,60 +67,55 @@ namespace AstarView
                 {
                     Nodes[x, y] = new NodeView();
                     Nodes[x, y].Margin = new Thickness(2 + x * (Nodes[x, y].Width + 2), y * (Nodes[x, y].Height + 2), 0, 0);
-                    Nodes[x, y].Pos = new Position(x, y);
-                    Nodes[x, y].Pos = new Position(x, y);
+                    Nodes[x, y].PosX = x;
+                    Nodes[x, y].PosY = y;
                     gridView.Children.Add(Nodes[x, y]);
                 }
             }
         }
         private void ShowMap()
         {
-            for (int y = 0; y < pathFinder.Height; y++)
+            foreach (var pathnode in pathFinder.NodesList.Cast<AstarNode>())
             {
-                string line = string.Empty;
-                for (int x = 0; x < pathFinder.Width; x++)
+                var nodeView = Nodes[pathnode.Pos.x, pathnode.Pos.y];
+                if (ShowValues)
                 {
-                    var node = Nodes[x, y];
-                    var pathnode = pathFinder.Nodes[x, pathFinder.Height - y - 1];
-                    if (ShowValues)
-                    {
-                        node.Gvalue.Text = pathnode.Gcost.ToString();
-                        node.Hvalue.Text = pathnode.Hcost.ToString();
-                        node.Fvalue.Text = pathnode.Fcost.ToString();
-                        node.Mvalue.Text = "x" + pathnode.Multiplier.ToString();
-                    }
-                    else
-                    {
-                        node.Gvalue.Text = "";
-                        node.Hvalue.Text = "";
-                        node.Fvalue.Text = "";
-                        node.Mvalue.Text = "";
-                    }
-
-                    if (pathnode.IsEndNode)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#00F"));
-                    else if (pathnode.IsStartNode)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#F00"));
-                    else if (pathnode.PathFound)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#0F0"));
-                    else if (pathnode.IsChecked)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#DDD"));
-                    else if (pathnode.Gcost > 0)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#AAA"));
-                    else if (pathnode.IsWall)
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#000"));
-                    else
-                        node.background.Background = (Brush)(new BrushConverter().ConvertFrom("#EEE"));
+                    nodeView.Gvalue.Text = pathnode.Gcost.ToString();
+                    nodeView.Hvalue.Text = pathnode.Hcost.ToString();
+                    nodeView.Fvalue.Text = pathnode.Fcost.ToString();
+                    nodeView.Mvalue.Text = "x" + pathnode.Multiplier.ToString();
                 }
+                else
+                {
+                    nodeView.Gvalue.Text = "";
+                    nodeView.Hvalue.Text = "";
+                    nodeView.Fvalue.Text = "";
+                    nodeView.Mvalue.Text = "";
+                }
+
+                if (pathnode.IsEndNode)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#00F"));
+                else if (pathnode.IsStartNode)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#F00"));
+                else if (pathnode.PathFound)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#0F0"));
+                else if (pathnode.IsChecked)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#DDD"));
+                else if (pathnode.Gcost > 0)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#AAA"));
+                else if (pathnode.IsWall)
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#000"));
+                else
+                    nodeView.background.Background = (Brush)(new BrushConverter().ConvertFrom("#EEE"));
             }
         }
 
-        public void AddMultiplier(Position pos)
+        public void AddMultiplier(int posX, int posY)
         {
             if (Started || !float.TryParse(multiplier.Text.Replace(".", ","), out float mult)) return;
 
             pathFinder.Reset();
-            var node = pathFinder.GetNode(pos.X, pathFinder.Height - pos.Y - 1);
+            var node = pathFinder.GetNode(posX, posY);
             node.SetCostMultiplier(mult);
         }
         private void StartPath_Click(object sender, RoutedEventArgs e)
