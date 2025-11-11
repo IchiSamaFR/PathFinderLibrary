@@ -9,7 +9,7 @@ namespace AstarLibrary.Modules
         private const int DefaultHeight = 10;
 
         private bool _isFinished;
-        private Dictionary<(int x, int y), AstarNode> _nodes;
+        private Dictionary<(int x, int y), AstarNode> _nodes = new();
         private List<INode> _nodesListCache;
         private AstarNode _startingNode;
         private AstarNode _endingNode;
@@ -55,20 +55,33 @@ namespace AstarLibrary.Modules
         {
             Width = width;
             Height = height;
-            _nodes = new Dictionary<(int x, int y), AstarNode>();
 
-            SetStartPos(start ?? (0, 0));
-            SetEndPos(end ?? (width - 1, height - 1));
+            if (start != null)
+            {
+                SetEndPos(start.Value.x, start.Value.y);
+            }
+            else
+            {
+                SetEndPos(0, 0);
+            }
+            if (end != null)
+            {
+                SetEndPos(end.Value.x, end.Value.y);
+            }
+            else
+            {
+                SetEndPos(width - 1, height - 1);
+            }
         }
 
-        public AstarNode SelectNextNode()
+        public INode SelectNextNode()
         {
             if (PathFinished)
             {
                 return null;
             }
 
-            AstarNode nodeToSelect = FindLowestCostNode();
+            var nodeToSelect = FindLowestCostNode();
 
             if (nodeToSelect != null)
             {
@@ -80,11 +93,11 @@ namespace AstarLibrary.Modules
             return null;
         }
 
-        public List<AstarNode> SelectPath()
+        public List<INode> SelectPath()
         {
             while (!PathFinished)
             {
-                AstarNode nodeToSelect = FindLowestCostNode();
+                var nodeToSelect = FindLowestCostNode();
 
                 if (nodeToSelect != null)
                 {
@@ -96,7 +109,7 @@ namespace AstarLibrary.Modules
                 }
             }
 
-            return _endingNode?.GetEndPath() ?? new List<AstarNode>();
+            return _endingNode?.GetEndPath().Cast<INode>().ToList() ?? new List<INode>();
         }
 
         public void ToggleWall(int x, int y)
@@ -115,8 +128,8 @@ namespace AstarLibrary.Modules
             _nodes.Clear();
             _nodesListCache = null;
 
-            SetStartPos(_startingPos);
-            SetEndPos(_endingPos);
+            SetStartPos(_startingPos.x, _startingPos.y);
+            SetEndPos(_endingPos.x, _endingPos.y);
         }
         public void Reset()
         {
@@ -133,8 +146,8 @@ namespace AstarLibrary.Modules
                 node.Reset();
             }
 
-            SetStartPos(_startingPos);
-            SetEndPos(_endingPos);
+            SetStartPos(_startingPos.x, _startingPos.y);
+            SetEndPos(_endingPos.x, _endingPos.y);
             _nodesListCache = null;
         }
 
@@ -166,14 +179,14 @@ namespace AstarLibrary.Modules
             {
                 _nodes.Remove(kvp.Key);
             }
-            SetStartPos(_startingPos);
-            SetEndPos(_endingPos);
+            SetStartPos(_startingPos.x, _startingPos.y);
+            SetEndPos(_endingPos.x, _endingPos.y);
             _nodesListCache = null;
         }
 
-        public void SetStartPos((int x, int y) startPos)
+        public void SetStartPos(int x, int y)
         {
-            if (!IsValidPosition(startPos.x, startPos.y))
+            if (!IsValidPosition(x, y))
             {
                 return;
             }
@@ -183,8 +196,8 @@ namespace AstarLibrary.Modules
                 _startingNode.IsStartNode = false;
             }
 
-            _startingPos = startPos;
-            _startingNode = GetOrCreateNode(startPos.x, startPos.y);
+            _startingPos = (x, y);
+            _startingNode = GetOrCreateNode(x, y);
 
             if (_endingPos != default)
             {
@@ -195,20 +208,20 @@ namespace AstarLibrary.Modules
             _nodesListCache = null;
         }
 
-        public void SetEndPos((int x, int y) endPos)
+        public void SetEndPos(int x, int y)
         {
-            if (!IsValidPosition(endPos.x, endPos.y))
+            if (!IsValidPosition(x, y))
             {
                 return;
             }
 
-            if(_endingNode != null)
+            if (_endingNode != null)
             {
                 _endingNode.IsEndNode = false;
             }
 
-            _endingPos = endPos;
-            _endingNode = GetOrCreateNode(endPos.x, endPos.y);
+            _endingPos = (x, y);
+            _endingNode = GetOrCreateNode(x, y);
 
             if (_startingNode != null)
             {
