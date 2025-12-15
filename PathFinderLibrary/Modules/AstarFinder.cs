@@ -58,11 +58,11 @@ namespace AstarLibrary.Modules
 
             if (start != null)
             {
-                SetEndPos(start.Value.x, start.Value.y);
+                SetStartPos(start.Value.x, start.Value.y);
             }
             else
             {
-                SetEndPos(0, 0);
+				SetStartPos(0, 0);
             }
             if (end != null)
             {
@@ -112,7 +112,18 @@ namespace AstarLibrary.Modules
             return _endingNode?.GetEndPath().Cast<INode>().ToList() ?? new List<INode>();
         }
 
-        public void ToggleWall(int x, int y)
+        public void ClearWalls()
+        {
+            foreach (var node in _nodes.Values)
+            {
+                if (node.IsWall && !node.IsStartNode && !node.IsEndNode)
+                {
+                    node.IsWall = false;
+                }
+            }
+		}
+
+		public void ToggleWall(int x, int y)
         {
             var node = GetNode(x, y);
             if (node != null && !node.IsStartNode && !node.IsEndNode)
@@ -121,7 +132,51 @@ namespace AstarLibrary.Modules
             }
         }
 
-        public void Clear()
+		public void ToggleWalls(List<(int x, int y)> positions)
+        {
+            foreach (var pos in positions)
+            {
+                ToggleWall(pos.x, pos.y);
+            }
+		}
+
+        public AstarFinder SetWalls(IEnumerable<(int x, int y)> positions)
+        {
+            foreach (var node in _nodes)
+            {
+                node.Value.IsWall = false;
+            }
+
+            foreach (var pos in positions)
+			{
+				var node = GetNode(pos.x, pos.y);
+				if (node != null && !node.IsStartNode && !node.IsEndNode)
+				{
+					node.IsWall = true;
+				}
+			}
+            return this;
+		}
+
+        public AstarFinder SetWalkables(IEnumerable<(int x, int y)> positions)
+		{
+			foreach (var node in _nodes)
+			{
+				node.Value.IsWall = true;
+			}
+
+			foreach (var pos in positions)
+			{
+				var node = GetNode(pos.x, pos.y);
+				if (node != null)
+				{
+					node.IsWall = false;
+				}
+			}
+			return this;
+		}
+
+		public void Clear()
         {
             PathFinished = false;
 
@@ -232,45 +287,61 @@ namespace AstarLibrary.Modules
             _nodesListCache = null;
         }
 
-        private List<AstarNode> GetNodesAround((int x, int y) pos)
-        {
-            List<AstarNode> nodes = new List<AstarNode>(IsDiagonal ? 8 : 4);
+		private AstarNode AddNodeIfExists(int x, int y)
+		{
+			if (IsValidPosition(x, y))
+			{
+				return GetOrCreateNode(x, y);
+			}
+			return null;
+		}
 
-            if (IsDiagonal)
-            {
-                for (int x = pos.x - 1; x <= pos.x + 1; x++)
-                {
-                    for (int y = pos.y - 1; y <= pos.y + 1; y++)
-                    {
-                        if (x == pos.x && y == pos.y)
-                        {
-                            continue;
-                        }
+		private List<AstarNode> GetNodesAround((int x, int y) pos)
+		{
+			List<AstarNode> nodes = new();
 
-                        AddNodeIfExists(nodes, x, y);
-                    }
-                }
-            }
-            else
-            {
-                AddNodeIfExists(nodes, pos.x + 1, pos.y);
-                AddNodeIfExists(nodes, pos.x - 1, pos.y);
-                AddNodeIfExists(nodes, pos.x, pos.y + 1);
-                AddNodeIfExists(nodes, pos.x, pos.y - 1);
-            }
+			if (IsDiagonal)
+			{
+				for (int x = pos.x - 1; x <= pos.x + 1; x++)
+				{
+					for (int y = pos.y - 1; y <= pos.y + 1; y++)
+					{
+						if (x == pos.x && y == pos.y)
+						{
+							continue;
+						}
 
-            return nodes;
-        }
+						var node = AddNodeIfExists(x, y);
+						if (node != null)
+						{
+							nodes.Add(node);
+						}
+					}
+				}
+			}
+			else
+			{
+				var node = AddNodeIfExists(pos.x + 1, pos.y);
+				if (node != null)
+                    nodes.Add(node);
 
-        private void AddNodeIfExists(List<AstarNode> nodes, int x, int y)
-        {
-            if (IsValidPosition(x, y))
-            {
-                nodes.Add(GetOrCreateNode(x, y));
-            }
-        }
+				node = AddNodeIfExists(pos.x - 1, pos.y);
+				if (node != null)
+                    nodes.Add(node);
 
-        public AstarNode GetNode(int x, int y)
+			    node = AddNodeIfExists(pos.x, pos.y + 1);
+				if (node != null)
+                    nodes.Add(node);
+
+				node = AddNodeIfExists(pos.x, pos.y - 1);
+				if (node != null)
+                    nodes.Add(node);
+			}
+
+			return nodes;
+		}
+
+		public AstarNode GetNode(int x, int y)
         {
             if (!IsValidPosition(x, y))
             {

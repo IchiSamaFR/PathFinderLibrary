@@ -69,7 +69,10 @@ namespace AstarLibrary.Models
             PathFound = true;
 
             if (Previous != null)
-                lst.AddRange(Previous.SetEndPath());
+			{
+				lst.Add(Previous);
+				lst.AddRange(Previous.SetEndPath());
+			}
             return lst;
         }
         public List<AstarNode> GetEndPath()
@@ -77,7 +80,10 @@ namespace AstarLibrary.Models
             var lst = new List<AstarNode>();
 
             if (Previous != null)
-                lst.AddRange(Previous.SetEndPath());
+            {
+                lst.Add(Previous);
+				lst.AddRange(Previous.SetEndPath());
+			}
             return lst;
         }
 
