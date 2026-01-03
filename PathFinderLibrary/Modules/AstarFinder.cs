@@ -175,6 +175,25 @@ namespace AstarLibrary.Modules
 			}
 			return this;
 		}
+		public AstarFinder SetWalkables(Dictionary<(int x, int y), float> positions)
+		{
+			foreach (var node in _nodes)
+			{
+				node.Value.IsWall = true;
+			}
+
+			foreach (var pair in positions)
+			{
+				var node = GetNode(pair.Key.x, pair.Key.y);
+				if (node == null)
+				{
+                    continue;
+				}
+
+				node.SetCostMultiplier(pair.Value);
+			}
+			return this;
+		}
 
 		public void Clear()
         {
